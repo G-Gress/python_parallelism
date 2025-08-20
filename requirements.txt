@@ -1,5 +1,8 @@
+ipykernel
+joblib
 numpy
 Pillow
-tqdm
-joblib
 scikit-learn
+tqdm
+matplotlib
+seaborn
