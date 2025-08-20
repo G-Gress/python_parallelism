@@ -1,8 +1,13 @@
 ipykernel
 joblib
-numpy
 Pillow
-scikit-learn
 tqdm
+
+numpy
+
 matplotlib
 seaborn
+
+scikit-learn
+tensorflow
+tensorflow_datasets
