@@ -4,3 +4,5 @@
 makefile.sample
 *.egg-info/
 data/
+**/__pycache__/
+*.pyc
