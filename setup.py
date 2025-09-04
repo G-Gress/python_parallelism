@@ -5,7 +5,7 @@ with open("requirements.txt") as f:
     content = f.readlines()
 requirements = [x.strip() for x in content if "git+" not in x]
 
-setup(name='python-parallelism',
+setup(name='python_parallelism',
       version="0.0.1",
       description="Image preprocessing and model training using parallelism in python",
       license="MIT",
