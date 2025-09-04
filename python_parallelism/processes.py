@@ -1,16 +1,16 @@
-'''
+"""
 Processes-based parallelism for applying functions to lists of data in batches.
-'''
+"""
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Callable, Any
 
 def batch_worker(batch: List[Any], func: Callable, *args, **kwargs) -> List[Any]:
-    '''
+    """
     Applies a function to each item of a batch of data.
     Used as a worker function for parallel processing.
     Returns a list of results.
-    '''
+    """
     return [func(item, *args, **kwargs) for item in batch]
 
 def parallel_map_batched(
@@ -23,10 +23,10 @@ def parallel_map_batched(
     limit: int = None,
     display_progress: bool = False
 ) -> List[Any]:
-    '''
+    """
     Applies a function to a list of paths, splitted into batches.
     Returns a list of results.
-    '''
+    """
 
     # Reduces the list of paths to a given limit to avoid processing too many files
     if limit:
