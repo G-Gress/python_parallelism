@@ -143,7 +143,7 @@ def preprocess_one_min(path: Any, size: tuple = (224, 224), bins: int = 32) -> d
         "color_hist": color_hist
     }
 
-def preprocess_all_serial(image_paths: List[str], size: tuple = (224, 224), bins: int = 32, limit: int = None) -> List[dict]:
+def preprocess_all_serial(paths: List[str], size: tuple = (224, 224), bins: int = 32, limit: int = None) -> List[dict]:
     """
     Preprocess pipeline for a list of images.
     Returns a list of dictionaries, each containing components for reuse.
@@ -158,5 +158,5 @@ def preprocess_all_serial(image_paths: List[str], size: tuple = (224, 224), bins
         list: A list of dictionaries, each containing components for reuse.
     """
     if limit is not None:
-        image_paths = image_paths[:limit]
-    return [preprocess_one(path, size=size, bins=bins) for path in image_paths]
+        paths = paths[:limit]
+    return [preprocess_one(path, size=size, bins=bins) for path in paths]
