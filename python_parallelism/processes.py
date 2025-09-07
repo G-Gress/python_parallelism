@@ -2,13 +2,14 @@
 Processes-based parallelism for applying functions to lists of data in batches.
 """
 
+import inspect
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Callable, Any
 
 def batch_worker(batch: List[Any], func: Callable, *args, **kwargs) -> List[Any]:
     """
+    Used as a worker for parallel processing.
     Applies a function to each item of a batch of data.
-    Used as a worker function for parallel processing.
     Returns a list of results.
 
     Args:
@@ -31,7 +32,10 @@ def parallel_map_batched(
     display_progress: bool = False
 ) -> List[Any]:
     """
-    Applies a function to a list of paths, splitted into batches.
+    Takes a list of paths, splits it into batches
+    and applies a function to each batch in parallel using ProcessPoolExecutor.
+    If the function takes a single path, it will be applied to each item in the batch using batch_worker.
+    If the function takes a list of paths, it will be applied directly to each batch.
     Returns a list of results.
 
     Args:
@@ -56,12 +60,32 @@ def parallel_map_batched(
     batches = [paths[i:i + batch_size] for i in range(0, len(paths), batch_size)]
     results = []
 
+    # Inspect the function signature to determine if it takes a single path or a list of paths
+    signature = inspect.signature(func)
+    parameters = list(signature.parameters.values())
+    if len(parameters) == 0:
+        raise ValueError("The function must have at least one parameter.")
+
+    is_batch_function = (
+        len(parameters) > 0 and
+        parameters[0].annotation in (list, tuple) or
+        parameters[0].name in ('paths', 'batch')
+    )
+
     # Parallel processing of batches
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(batch_worker, batch, func, *func_args, **func_kwargs)
-            for batch in batches
-        ]
+        if is_batch_function:
+            # If the function takes a list of paths, use it directly as the worker
+            futures = [
+                executor.submit(func, batch, *func_args, **func_kwargs)
+                for batch in batches
+            ]
+        else:
+            # If the function takes a single path, use batch_worker as the worker
+            futures = [
+                executor.submit(batch_worker, batch, func, *func_args, **func_kwargs)
+                for batch in batches
+            ]
 
         for i, future in enumerate(as_completed(futures)):
             batch_result = future.result()
