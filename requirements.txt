@@ -11,3 +11,5 @@ seaborn
 scikit-learn
 tensorflow
 tensorflow_datasets
+
+pytest
