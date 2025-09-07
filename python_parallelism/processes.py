@@ -6,6 +6,29 @@ import inspect
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Callable, Any
 
+def is_batched_function(func: Callable) -> bool:
+    """
+    Check if the function takes a list or tuple as its first parameter.
+
+    Args:
+        func (Callable): The function to inspect.
+
+    Returns:
+        bool: True if the function takes a list or tuple as its first parameter, False otherwise.
+    """
+
+    # Inspect the function signature to determine if it takes a single path or a list of paths
+    signature = inspect.signature(func)
+    parameters = list(signature.parameters.values())
+    if len(parameters) == 0:
+        raise ValueError("The function must have at least one parameter.")
+
+    return (
+        len(parameters) > 0 and
+        parameters[0].annotation in (list, tuple) or
+        parameters[0].name in ('paths', 'batch')
+    )
+
 def batch_worker(batch: List[Any], func: Callable, *args, **kwargs) -> List[Any]:
     """
     Used as a worker for parallel processing.
@@ -60,21 +83,9 @@ def parallel_map_batched(
     batches = [paths[i:i + batch_size] for i in range(0, len(paths), batch_size)]
     results = []
 
-    # Inspect the function signature to determine if it takes a single path or a list of paths
-    signature = inspect.signature(func)
-    parameters = list(signature.parameters.values())
-    if len(parameters) == 0:
-        raise ValueError("The function must have at least one parameter.")
-
-    is_batch_function = (
-        len(parameters) > 0 and
-        parameters[0].annotation in (list, tuple) or
-        parameters[0].name in ('paths', 'batch')
-    )
-
     # Parallel processing of batches
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        if is_batch_function:
+        if is_batched_function(func):
             # If the function takes a list of paths, use it directly as the worker
             futures = [
                 executor.submit(func, batch, *func_args, **func_kwargs)
