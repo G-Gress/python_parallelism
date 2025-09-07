@@ -9,6 +9,7 @@ from typing import List, Callable, Any
 def is_batched_function(func: Callable) -> bool:
     """
     Check if the function takes a list or tuple as its first parameter.
+    If so, that list or tuple is assumed to be a batch of paths.
 
     Args:
         func (Callable): The function to inspect.
@@ -83,20 +84,20 @@ def parallel_map_batched(
     batches = [paths[i:i + batch_size] for i in range(0, len(paths), batch_size)]
     results = []
 
+    # Check if the function takes a list of paths or a single path as first argument
+    if is_batched_function(func):
+        # If the function takes a list of paths, use it directly as the worker
+        submit_function = func
+    else:
+        # If the function takes a single path, use batch_worker as the worker
+        submit_function = batch_worker
+
     # Parallel processing of batches
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        if is_batched_function(func):
-            # If the function takes a list of paths, use it directly as the worker
-            futures = [
-                executor.submit(func, batch, *func_args, **func_kwargs)
-                for batch in batches
-            ]
-        else:
-            # If the function takes a single path, use batch_worker as the worker
-            futures = [
-                executor.submit(batch_worker, batch, func, *func_args, **func_kwargs)
-                for batch in batches
-            ]
+        futures = [
+            executor.submit(submit_function, batch, *func_args, **func_kwargs)
+            for batch in batches
+        ]
 
         for i, future in enumerate(as_completed(futures)):
             batch_result = future.result()
