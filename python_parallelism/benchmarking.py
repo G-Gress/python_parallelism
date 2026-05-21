@@ -208,3 +208,92 @@ def build_batching_overhead_summary(
     )
     out["speedup_vs_baseline"] = out["baseline_s"] / out["best_s"]
     return out
+
+
+def summarize_preprocessing_benchmarks(
+    benchmark_path: Path,
+    *,
+    batch_sizes: Sequence[int],
+    serial_min_key: str = "serial_min",
+    serial_full_key: str = "serial_full",
+    process_min_key: str = "process_min_4w",
+    process_full_key: str = "process_full_4w",
+    batched_min_key_format: str = "batched_process_min_{batch_size}",
+    batched_full_key_format: str = "batched_process_full_{batch_size}",
+    metric: str = "mean",
+) -> tuple[pd.DataFrame | None, list[str], list[str]]:
+    """Summarize preprocessing benchmarks into a compact table and conclusions.
+
+    Returns:
+        (summary_df_or_None, conclusions, missing_keys)
+
+    If `missing_keys` is non-empty, `summary_df_or_None` will be None.
+    """
+
+    df = load_benchmarks_as_dataframe(benchmark_path)
+
+    required = [serial_min_key, serial_full_key, process_min_key, process_full_key]
+    required += [batched_min_key_format.format(batch_size=int(b)) for b in batch_sizes]
+    required += [batched_full_key_format.format(batch_size=int(b)) for b in batch_sizes]
+    missing = [k for k in required if k not in df.index]
+    if missing:
+        return None, [], missing
+
+    best_min_bs, best_min_time, _ = find_best_batch_size(
+        df,
+        key_format=batched_min_key_format,
+        batch_sizes=batch_sizes,
+        metric=metric,
+    )
+    best_full_bs, best_full_time, _ = find_best_batch_size(
+        df,
+        key_format=batched_full_key_format,
+        batch_sizes=batch_sizes,
+        metric=metric,
+    )
+
+    serial_min_time = float(df.loc[serial_min_key, metric])
+    serial_full_time = float(df.loc[serial_full_key, metric])
+    process_min_time = float(df.loc[process_min_key, metric])
+    process_full_time = float(df.loc[process_full_key, metric])
+
+    records = [
+        ("Minimal dict", "Serial", serial_min_time, serial_min_time),
+        ("Minimal dict", "Processes (no batch)", process_min_time, serial_min_time),
+        (
+            "Minimal dict",
+            f"Processes + batch (bs={best_min_bs})",
+            float(best_min_time),
+            serial_min_time,
+        ),
+        ("Full dict", "Serial", serial_full_time, serial_full_time),
+        ("Full dict", "Processes (no batch)", process_full_time, serial_full_time),
+        (
+            "Full dict",
+            f"Processes + batch (bs={best_full_bs})",
+            float(best_full_time),
+            serial_full_time,
+        ),
+    ]
+
+    summary = pd.DataFrame.from_records(
+        records,
+        columns=["Payload", "Method", "Mean time (s)", "_serial_ref_s"],
+    )
+    summary["Speedup vs serial"] = summary["_serial_ref_s"] / summary["Mean time (s)"]
+    summary = summary.drop(columns=["_serial_ref_s"])
+
+    min_best_method = (
+        "Processes + batch" if best_min_time < process_min_time else "Processes (no batch)"
+    )
+    full_best_method = (
+        "Processes + batch" if best_full_time < process_full_time else "Processes (no batch)"
+    )
+
+    conclusions = [
+        f"Minimal dict: use {min_best_method}.",
+        f"Full dict: use {full_best_method} (best tested batch size: {best_full_bs}).",
+        "Batching is a tuning knob, not a universal optimization.",
+    ]
+
+    return summary, conclusions, []
