@@ -1,6 +1,7 @@
 .vscode
 .venv
 .env
+benchmarks/benchmark_results.json
 makefile.sample
 *.egg-info/
 data/
