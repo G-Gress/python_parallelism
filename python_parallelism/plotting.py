@@ -1,3 +1,5 @@
+"""Plotting utilities for the Python parallelism benchmarks and experiments."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
