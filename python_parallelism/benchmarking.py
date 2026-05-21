@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -124,3 +125,86 @@ def load_benchmarks_as_dataframe(json_path: Path) -> pd.DataFrame:
     )
     
     return df
+
+
+def find_best_batch_size(
+    df_benchmark: pd.DataFrame,
+    *,
+    key_format: str,
+    batch_sizes: Sequence[int],
+    metric: str = "mean",
+    strict: bool = True,
+) -> tuple[int, float, pd.Series]:
+    """Find the batch size with the lowest metric.
+
+    Args:
+        df_benchmark: Dataframe returned by `load_benchmarks_as_dataframe` (index is benchmark keys).
+        key_format: Format string such as "batched_process_min_{batch_size}".
+        batch_sizes: Candidate batch sizes.
+        metric: Column in df_benchmark to optimize (default: "mean").
+        strict: If True, raise if any expected key is missing. If False, ignore missing keys.
+
+    Returns:
+        (best_batch_size, best_value, series_of_values_by_batch_size)
+    """
+
+    values: dict[int, float] = {}
+    missing: list[str] = []
+    for b in batch_sizes:
+        key = key_format.format(batch_size=int(b))
+        try:
+            values[int(b)] = float(df_benchmark.loc[key, metric])
+        except KeyError:
+            missing.append(key)
+
+    if strict and missing:
+        raise KeyError(
+            "Missing benchmark keys in df_benchmark: " + ", ".join(missing)
+        )
+    if not values:
+        raise ValueError("No benchmark values found for the provided batch sizes.")
+
+    series = pd.Series(values).sort_index()
+    best_batch_size = int(series.idxmin())
+    best_value = float(series.loc[best_batch_size])
+    return best_batch_size, best_value, series
+
+
+def build_batching_overhead_summary(
+    df_benchmark: pd.DataFrame,
+    *,
+    batch_sizes: Sequence[int],
+    minimal_key_format: str = "batched_process_min_{batch_size}",
+    full_key_format: str = "batched_process_full_{batch_size}",
+    minimal_baseline_key: str = "process_min_4w",
+    full_baseline_key: str = "process_full_4w",
+    metric: str = "mean",
+) -> pd.DataFrame:
+    """Build a compact table comparing batching for minimal vs full dict."""
+
+    best_min_bs, best_min_time, _ = find_best_batch_size(
+        df_benchmark,
+        key_format=minimal_key_format,
+        batch_sizes=batch_sizes,
+        metric=metric,
+    )
+    best_full_bs, best_full_time, _ = find_best_batch_size(
+        df_benchmark,
+        key_format=full_key_format,
+        batch_sizes=batch_sizes,
+        metric=metric,
+    )
+
+    no_batch_min_time = float(df_benchmark.loc[minimal_baseline_key, metric])
+    no_batch_full_time = float(df_benchmark.loc[full_baseline_key, metric])
+
+    out = pd.DataFrame(
+        {
+            "baseline_s": [no_batch_min_time, no_batch_full_time],
+            "best_batch_size": [best_min_bs, best_full_bs],
+            "best_s": [best_min_time, best_full_time],
+        },
+        index=pd.Index(["minimal", "full"], name="data"),
+    )
+    out["speedup_vs_baseline"] = out["baseline_s"] / out["best_s"]
+    return out
