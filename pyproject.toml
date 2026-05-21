@@ -1,0 +1,13 @@
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+  "setuptools_scm[toml]>=7",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# Allows tags like v0.3.1 or 0.3.1
+tag_regex = "^(?:v)?(?P<version>\\d+\\.\\d+\\.\\d+(?:[.-].*)?)$"
+version_scheme = "guess-next-dev"
+local_scheme = "node-and-date"
